@@ -23,6 +23,8 @@ use cli\arguments\Lexer;
 class Arguments implements \ArrayAccess {
 	protected $_flags = array();
 	protected $_options = array();
+	protected $_commands = array();
+	protected $_found_command = false;
 	protected $_strict = false;
 	protected $_input = array();
 	protected $_invalid = array();
@@ -52,6 +54,9 @@ class Arguments implements \ArrayAccess {
 		}
 		if (isset($options['options'])) {
 			$this->addOptions($options['options']);
+		}
+		if (isset($options['commands'])) {
+			$this->addCommands($options['commands']);
 		}
 	}
 
@@ -252,6 +257,48 @@ class Arguments implements \ArrayAccess {
 	}
 
 	/**
+	 * Adds an command (string argument) to the argument list.
+	 *
+	 * @param mixed  $flag  A string representing the option, or an array of strings.
+	 * @param array  $settings  An array of settings for this option.
+	 * @setting string  description  A description to be shown in --help.
+	 * @return $this
+	 */
+	public function addCommand($command, $settings = array()) {
+	    if (is_string($settings)) {
+	        $settings = array('description' => $settings);
+	    }
+	    if (isset($this->_commands[$command])) {
+	        $this->_warn('command already exists: ' . $command);
+	        return $this;
+	    }
+
+	    $this->_commands[$command] = $settings;
+	    return $this;
+	}
+
+	/**
+	 * Add multiple commands at once. The input array should be keyed with the
+	 * primary option string, and the values should be the settings array
+	 * used by {addCommand}.
+	 *
+	 * @param array  $options  An array of commands to add
+	 * @return $this
+	 */
+	public function addCommands($commands) {
+	    foreach ($commands as $command => $settings) {
+	        if (is_numeric($command)) {
+	            $this->_warn('No option string given');
+	            continue;
+	        }
+
+	        $this->addCommand($command, $settings);
+	    }
+
+	    return $this;
+	}
+
+	/**
 	 * Enable or disable strict mode. If strict mode is active any invalid
 	 * arguments found by the parser will throw `cli\arguments\InvalidArguments`.
 	 *
@@ -298,7 +345,7 @@ class Arguments implements \ArrayAccess {
 					$obj->key = $master;
 				}
 
-				$cache[$flag] =& $settings;
+				$cache[$flag] = &$settings;
 				return $settings;
 			}
 		}
@@ -383,6 +430,33 @@ class Arguments implements \ArrayAccess {
 		return (null != $this->getOption($argument));
 	}
 
+	public function isCommand($argument)
+	{
+	    return (null != $this->getCommand($argument));
+	}
+
+	/**
+	 * Get an option by primary matcher or any defined aliases.
+	 *
+	 * @param mixed  $option Either a string representing the option or an
+	 *                       cli\arguments\Argument object.
+	 * @return array
+	 */
+	public function getCommand($command) {
+	    if ($command instanceOf Argument) {
+	        $obj = $command;
+	        $command = $command->value;
+	    }
+
+	    if (isset($this->_commands[$command])) {
+	        return $this->_commands[$command];
+	    }
+	}
+
+	public function getCommands() {
+	    return $this->_commands;
+	}
+
 	/**
 	 * Parses the argument list with the given options. The returned argument list
 	 * will use either the first long name given or the first name in the list
@@ -398,23 +472,32 @@ class Arguments implements \ArrayAccess {
 
 		$this->_applyDefaults();
 
-		foreach ($this->_lexer as $argument) {
-			if ($this->_parseFlag($argument)) {
-				continue;
-			}
-			if ($this->_parseOption($argument)) {
-				continue;
-			}
-
+		$parameters = array();
+        foreach ($this->_lexer as $argument) {
+		    if(!$this->_found_command) {
+                if ($this->_parseFlag($argument)) {
+                    continue;
+                }
+                if ($this->_parseOption($argument)) {
+                    continue;
+                }
+    			if ($this->_parseCommand($argument)) {
+    			    $this->_found_command = true;
+    			    continue;
+    			}
 			array_push($this->_invalid, $argument->raw);
+		    } else {
+		        $parameters[] = $argument->raw;
 		}
+		}
+		$this['parameters'] = $parameters;
 
 		if ($this->_strict && !empty($this->_invalid)) {
 			throw new InvalidArguments($this->_invalid);
 		}
 	}
 
-	/**
+    /**
 	 * This applies the default values, if any, of all of the
 	 * flags and options, so that if there is a default value
 	 * it will be available.
@@ -488,5 +571,15 @@ class Arguments implements \ArrayAccess {
 
 		$this[$option->key] = join(' ', $values);
 		return true;
+	}
+
+    private function _parseCommand($command)
+	{
+	    if (!$this->isCommand($command)) {
+	        return false;
+	    } else {
+	        $this['command'] = $command;
+	        return true;
+	    }
 	}
 }

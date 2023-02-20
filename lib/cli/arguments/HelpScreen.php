@@ -94,6 +94,10 @@ class HelpScreen {
 				$formatted .= "\n{$pad}{$desc}";
 			}
 
+            if ($settings['usage']) {
+			    $formatted .= "\n${pad} USAGE: {$settings['usage']}";
+			}
+
 			array_push($help, $formatted);
 		}
 

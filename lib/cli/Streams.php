@@ -93,7 +93,7 @@ class Streams {
 	 */
 	public static function line( $msg = '' ) {
 		// func_get_args is empty if no args are passed even with the default above.
-		$args = array_merge( func_get_args(), array( '' ) );
+		$args = count(func_get_args() > 0) ? func_get_args() : array( '' );
 		$args[0] .= "\n";
 
 		self::_call( 'out', $args );
