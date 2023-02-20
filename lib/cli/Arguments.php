@@ -485,10 +485,10 @@ class Arguments implements \ArrayAccess {
     			    $this->_found_command = true;
     			    continue;
     			}
-			array_push($this->_invalid, $argument->raw);
+			    array_push($this->_invalid, $argument->raw);
 		    } else {
 		        $parameters[] = $argument->raw;
-		}
+		    }
 		}
 		$this['parameters'] = $parameters;
 
@@ -561,13 +561,18 @@ class Arguments implements \ArrayAccess {
 		$values = array();
 
 		// Loop until we find a flag in peak-ahead
-		foreach ($this->_lexer as $value) {
+		/* foreach ($this->_lexer as $value) {
 			array_push($values, $value->raw);
 
 			if (!$this->_lexer->end() && !$this->_lexer->peek->isValue) {
 				break;
 			}
-		}
+		} */
+
+        // only get the current value from lexer
+        $this->_lexer->next();
+        $current_val = $this->_lexer->current();
+		array_push($values, $current_val);
 
 		$this[$option->key] = join(' ', $values);
 		return true;
